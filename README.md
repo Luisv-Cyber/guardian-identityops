@@ -35,6 +35,8 @@
 
 This lab goes beyond a basic AD build. It demonstrates *controlled* identity lifecycle management: role-based access, PowerShell automation with verified safe dry-run behavior, independent post-change verification, access auditing, and governance control testing — with an honest, unfinished cloud/hybrid layer on top, not a fabricated one.
 
+**Want the full story with screenshots inline, step by step?** → [`walkthrough/README.md`](walkthrough/README.md)
+
 ---
 
 ## `> ls -la ~/skills`
