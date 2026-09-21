@@ -1,261 +1,326 @@
-# Guardian Financial Technologies — Hybrid IAM Lifecycle Automation Lab
+<p align="center">
+  <img src="assets/banner.svg" alt="GUARDIAN IdentityOps" width="100%"/>
+</p>
 
-A portfolio project demonstrating identity lifecycle automation across a Windows Server Active Directory environment, with in-progress preparation for Microsoft Entra hybrid synchronization.
+<br>
 
-**Status at a glance:** Local Active Directory IAM automation and governance is **complete and validated**. Microsoft Entra hybrid synchronization is **in progress** — the Cloud Sync provisioning agent has been installed and configured, but actual synchronization has not yet been run or validated. See [Current Status](#current-status) and [Known Limitations / Remaining Work](#known-limitations--remaining-work) below for the exact line between what has been verified and what has not.
-
----
-
-## Table of Contents
-
-- [Project Overview](#project-overview)
-- [Business Problem](#business-problem)
-- [Architecture](#architecture)
-- [Active Directory Design](#active-directory-design)
-- [RBAC / Security Group Model](#rbac--security-group-model)
-- [PowerShell Automation](#powershell-automation)
-- [Joiner / Mover / Leaver Validation](#joiner--mover--leaver-validation)
-- [Access Auditing and Identity Control Testing](#access-auditing-and-identity-control-testing)
-- [Microsoft Entra Hybrid Identity Preparation](#microsoft-entra-hybrid-identity-preparation)
-- [Security Decisions](#security-decisions)
-- [What I Learned](#what-i-learned)
-- [Current Status](#current-status)
-- [Known Limitations / Remaining Work](#known-limitations--remaining-work)
-- [Evidence and Screenshots](#evidence-and-screenshots)
-- [Skills Demonstrated](#skills-demonstrated)
-- [Disclaimer](#disclaimer)
+<p align="center">
+  <img src="https://img.shields.io/badge/STATUS-IN%20PROGRESS-f5a623?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/LOCAL%20AD%20%2F%20IAM-COMPLETE-00ff88?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/ENTRA%20SYNC-PENDING-f5a623?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/POWERSHELL-JML%20AUTOMATION-00d4ff?style=for-the-badge&logo=powershell&logoColor=white"/>
+</p>
 
 ---
 
-## Project Overview
-
-Guardian Financial Technologies (GFT) is a fictional company used to model a realistic identity and access management environment. The project goes beyond a basic Active Directory lab by implementing controlled identity lifecycle management: role-based access control, PowerShell-driven Joiner/Mover/Leaver automation with safe dry-run behavior, independent verification after every change, access auditing, identity governance control testing, and preparation for Microsoft Entra hybrid identity.
-
-## Business Problem
-
-Manual identity administration at a growing organization tends to produce inconsistent access, stale accounts, privilege accumulation over time, and slow or incomplete offboarding — all of which create real security risk, particularly around terminated contractors retaining access. This project addresses that by enforcing group-based, least-privilege access and automating the lifecycle events (provisioning, role changes, termination) that are most often handled inconsistently by hand.
-
-## Architecture
+## `> cat overview.txt`
 
 ```
-Employee Data (CSV)
-        |
-        v
-PowerShell JML Automation (Invoke-Joiner / Invoke-Mover / Invoke-Leaver)
-        |
-        v
-Active Directory Domain Services (corp.guardianlab.internal)
-        |
-        v
-Group-based RBAC (Global Security Groups)
-        |
-        v
-Access Audit + Identity Control Validation
-        |
-        v
-Microsoft Entra Cloud Sync  <-- installed/configured, sync not yet run
-        |
-        v
-Microsoft Entra ID (MFA / Conditional Access / SSO)  <-- not yet configured
+[*] Lab Name    : Guardian Financial Technologies (GFT) — Hybrid IAM Lab
+[*] Platform    : Microsoft Azure (VM) + Windows Server 2022
+[*] Domain      : corp.guardianlab.internal
+[*] DC          : DC01
+[*] Resources   : Standard_D2als_v7  |  2 vCPU  |  4 GiB RAM
+[*] Network     : vnet-gft-identity  |  10.0.0.0/16  |  East US 2
+
+[+] Identity lifecycle lab demonstrating Active Directory, RBAC,
+[+] PowerShell Joiner/Mover/Leaver automation, access auditing, and
+[+] identity governance control validation — with active, in-progress
+[+] preparation for Microsoft Entra hybrid synchronization.
+
+[✓] Local AD / IAM lifecycle phase ......... COMPLETE
+[~] Microsoft Entra hybrid sync phase ...... IN PROGRESS
+[i] Overall project completion ............. ~70-75%
 ```
 
-**Azure infrastructure (completed):**
+This lab goes beyond a basic AD build. It demonstrates *controlled* identity lifecycle management: role-based access, PowerShell automation with verified safe dry-run behavior, independent post-change verification, access auditing, and governance control testing — with an honest, unfinished cloud/hybrid layer on top, not a fabricated one.
 
-| Resource | Value |
-|---|---|
-| Resource Group | `rg-gft-identitylab` |
-| Virtual Network | `vnet-gft-identity` (East US 2, `10.0.0.0/16`) |
-| Server Subnet | `snet-servers` (`10.0.1.0/24`) |
-| Domain Controller VM | `DC01` — Windows Server 2022 Datacenter: Azure Edition x64 Gen2, `Standard_D2als_v7` (2 vCPU / 4 GiB RAM) |
-| Private IP | Static at the Azure NIC layer (Windows itself still reports DHCP Enabled = Yes — this is expected Azure behavior; the platform reserves the IP rather than requiring it hardcoded in-guest) |
-| Network Security | Custom rule `Allow-RDP-MyIP` — TCP/3389 restricted to a single source IP, priority 310. The default/broad RDP allow rule was removed. |
-| Cost control | Auto-shutdown configured; VM stopped/deallocated between lab sessions |
+---
 
-Full detail: [`docs/architecture.md`](docs/architecture.md)
+## `> ls -la ~/skills`
 
-## Active Directory Design
-
-Domain controller `DC01` runs AD DS and DNS for the forest `corp.guardianlab.internal`. Verified via `Get-ADDomain`, `Get-ADForest`, and `Get-Service DNS,NTDS` (both services confirmed running).
-
-```
-corp.guardianlab.internal
-└── GFT
-    ├── Users
-    │   ├── IT
-    │   ├── Security
-    │   ├── Human Resources
-    │   ├── Finance
-    │   └── Operations
-    ├── Groups
-    ├── Servers
-    ├── Service Accounts
-    ├── Administrative Accounts
-    ├── Disabled Users
-    └── Contractors
-```
-
-## RBAC / Security Group Model
-
-All access is granted through Global Security Groups — never assigned directly to individual users.
-
-| Group | Purpose |
-|---|---|
-| `GG-All-Employees` | Baseline group for every employee |
-| `GG-EmployeePortal-Users` | Baseline employee application access |
-| `GG-Contractors` | Baseline (and by default, only) group for contractors |
-| `GG-IT-Users` | IT department access |
-| `GG-IT-HelpDesk` | Help Desk role access |
-| `GG-HelpDesk-PasswordReset` | Scoped password-reset delegation |
-| `GG-Security-Users` | Security department access |
-| `GG-Security-Analysts` | Security Analyst role access |
-| `GG-HR-Users` | HR department access |
-| `GG-Finance-Users` | Finance department access |
-| `GG-Finance-Analysts` | Finance Analyst role access |
-| `GG-FinanceApp-Users` | Finance application access |
-| `GG-Operations-Users` | Operations department access |
-| `GG-Server-Admins` | Privileged infrastructure access |
-
-**Role-to-group mapping**, e.g.: a normal employee gets `GG-All-Employees` + `GG-EmployeePortal-Users`; a Finance Analyst additionally gets `GG-Finance-Users`, `GG-Finance-Analysts`, and `GG-FinanceApp-Users`; a contractor gets `GG-Contractors` **only** by default, with no employee baseline groups — any further access must be explicitly granted. Regular lifecycle automation does not assign `GG-Server-Admins` to standard accounts under any circumstance, including a title change to a systems administration role.
-
-## PowerShell Automation
-
-```
-C:\GFT-IAM\
-├── Data
-├── Logs
-├── Reports
-└── Scripts
-    ├── Get-AccessAudit.ps1
-    ├── Invoke-Joiner.ps1
-    ├── Invoke-Leaver.ps1
-    ├── Invoke-Mover.ps1
-    ├── New-LabUsers.ps1
-    ├── Test-IdentityControls.ps1
-    └── Modules
-        └── IAMLabCommon.psm1
-```
-
-Every lifecycle script supports `-WhatIf` / `-Confirm` (`SupportsShouldProcess`) and logs to `Scripts\Logs\` (`Joiner.log`, `Mover.log`, `Leaver.log`). See [`docs/joiner-workflow.md`](docs/joiner-workflow.md), [`docs/mover-workflow.md`](docs/mover-workflow.md), and [`docs/leaver-workflow.md`](docs/leaver-workflow.md) for the full before/whatif/after detail of each validated run.
-
-**A real bug was found and fixed during testing, not just designed around:** the initial `Invoke-Joiner.ps1` implementation still created a live AD account during a `-WhatIf` dry run. This was caught by manually verifying `Get-ADUser` after the dry run, the incorrectly created test account was removed, and `SupportsShouldProcess` / `$PSCmdlet.ShouldProcess()` were implemented correctly and re-validated. Full writeup in [What I Learned](#what-i-learned).
-
-## Joiner / Mover / Leaver Validation
-
-Three lifecycle scenarios were executed and independently verified against live AD state (not just script output):
-
-| Scenario | Identity | Result |
+| | Skill | Details |
 |---|---|---|
-| **Joiner** | Olivia Bennett (`GFT1031`) — new Finance Analyst | Account created in `OU=Finance`; groups: `Domain Users`, `GG-All-Employees`, `GG-EmployeePortal-Users`, `GG-Finance-Analysts`, `GG-FinanceApp-Users`, `GG-Finance-Users`. `VerificationPassed: True` |
-| **Mover** | Daniel Kim (`GFT1012`) — HR Coordinator → IT, Junior System Administrator | `GG-HR-Users` removed, `GG-IT-Users` added, moved to `OU=IT`; confirmed **no** `GG-Server-Admins` assigned despite the sysadmin title. `VerificationPassed: True` |
-| **Leaver** | Marcus Reed (`GFT1004`) — Finance contractor, terminated | Account disabled, `GG-Contractors` removed, moved to `OU=Disabled Users`; post-offboarding groups: `Domain Users` only. `VerificationPassed: True` |
+| 🖥️ | **Active Directory** | Forest/domain build, OU hierarchy, DNS |
+| ⚡ | **PowerShell** | Modular automation, `SupportsShouldProcess`, structured logging |
+| 🔐 | **RBAC** | 14 security groups, role-to-group mapping, zero direct assignment |
+| 🔄 | **IAM Lifecycle** | Joiner / Mover / Leaver — all three validated live |
+| 📋 | **Access Auditing** | Automated mismatch detection across test identities |
+| 🧪 | **Control Validation** | 7 identity governance controls, independently tested |
+| ☁️ | **Entra Hybrid Prep** | UPN suffix planning, Cloud Sync agent + gMSA configured |
+| 🛠️ | **Troubleshooting** | Found and fixed a live `-WhatIf` safety bug before it shipped |
+| 🌐 | **Azure Networking** | VNet, NSG hardening, static IP, auto-shutdown cost control |
 
-Each scenario was run as `-WhatIf` first, the dry-run output was checked against actual AD state to confirm no changes occurred, and only then executed for real.
+---
 
-## Access Auditing and Identity Control Testing
+## `> cat architecture.txt`
 
-`Get-AccessAudit.ps1` was run across all three test identities: **0 of 3 accounts flagged with an access mismatch.**
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Azure  (rg-gft-identitylab)               │
+│                                                                │
+│   ┌────────────────────────────────────────────────────────┐  │
+│   │              DC01 — Windows Server 2022                │  │
+│   │                                                        │  │
+│   │   Active Directory Domain Services + DNS               │  │
+│   │   Forest / Domain: corp.guardianlab.internal            │  │
+│   │                                                        │  │
+│   │   OUs                       Security Groups (14)       │  │
+│   │   ├── IT               →   GG-IT-Users / HelpDesk      │  │
+│   │   ├── Security         →   GG-Security-* / Analysts    │  │
+│   │   ├── Human Resources  →   GG-HR-Users                 │  │
+│   │   ├── Finance          →   GG-Finance-* / FinanceApp   │  │
+│   │   ├── Operations       →   GG-Operations-Users         │  │
+│   │   ├── Contractors      →   GG-Contractors (isolated)   │  │
+│   │   └── Disabled Users   →   (offboarded, zero access)   │  │
+│   └────────────────────────────────────────────────────────┘  │
+│                            │                                  │
+│                            ▼                                  │
+│              Entra Cloud Sync Agent (gMSA-based)               │
+│              STATUS: installed + configured                    │
+│              STATUS: sync NOT yet executed  ⚠                  │
+└──────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+              Microsoft Entra ID  (tenant accessed, not yet synced)
+              MFA / Conditional Access / SSO — NOT CONFIGURED
+```
 
-`Test-IdentityControls.ps1` validated seven identity governance controls — **all seven passed**:
+**RBAC model:**
+```
+User → Global Security Group → Resource Access   (never User → Resource directly)
+```
 
-| Control | Result |
-|---|---|
-| CONTROL-001 — Disabled users are not members of business groups | PASS |
-| CONTROL-002 — Contractors do not have `GG-Server-Admins` | PASS |
-| CONTROL-003 — FinanceApp access limited to approved Finance Analysts | PASS |
-| CONTROL-004 — Help Desk users do not have server admin rights | PASS |
-| CONTROL-005 — Privileged access uses separate `adm-` style accounts | PASS |
-| CONTROL-006 — Disabled users are located in the Disabled Users OU | PASS |
-| CONTROL-007 — Active employees have expected department groups | PASS |
+---
 
-**Final result: IDENTITY CONTROLS: PASS**
+## `> tree ./repo`
 
-## Microsoft Entra Hybrid Identity Preparation
+```
+guardian-identityops/
+├── README.md
+├── SECURITY.md
+├── assets/
+│   └── banner.svg
+├── docs/
+│   ├── architecture.md
+│   ├── project-status.md
+│   ├── lessons-learned.md
+│   ├── joiner-workflow.md
+│   ├── mover-workflow.md
+│   ├── leaver-workflow.md
+│   └── hybrid-identity-progress.md
+├── scripts/
+│   ├── Invoke-Joiner.ps1
+│   ├── Invoke-Mover.ps1
+│   ├── Invoke-Leaver.ps1
+│   ├── New-LabUsers.ps1
+│   ├── Get-AccessAudit.ps1
+│   ├── Test-IdentityControls.ps1
+│   └── Modules/
+│       └── IAMLabCommon.psm1
+├── sample-data/
+│   └── employees.example.csv
+└── screenshots/
+    └── README.md
+```
 
-**Completed:**
-* Microsoft Entra tenant accessed (Microsoft Entra ID Free license)
-* Alternative verified UPN suffix (`*.onmicrosoft.com`) added to AD, since `corp.guardianlab.internal` is not a routable cloud domain
-* Pilot identity (Olivia Bennett) UPN updated to the verified suffix; legacy logon name (`CORP\olivia.bennett`) preserved; new UPN confirmed via PowerShell
-* Dedicated cloud-only administrator created (`GFT Hybrid Identity Admin`, Member user type, **Hybrid Identity Administrator** Entra role, MFA registered) — kept intentionally separate from Azure subscription/VM permissions
-* Microsoft Entra Cloud Sync provisioning agent installed on `DC01` and configured with a group-managed service account (`corp.guardianlab.internal\provAgentgMSA`), authenticating as the dedicated Hybrid Identity Administrator
+---
 
-**Not completed — explicitly not claimed as working:**
-* Cloud Sync configuration and agent health verification in Entra
-* OU/group scoping for synchronization
-* Any actual synchronization of Olivia, Daniel, or any other user/group
-* Cloud sign-in or password-hash/cloud authentication validation
-* Conditional Access policy deployment or testing
-* Cloud MFA policy testing beyond registering MFA on the admin account
-* SSO / SAML / OIDC application integration
-* Azure App Service employee portal, Managed Identity, or Key Vault integration
-* Cloud-side Joiner/Mover/Leaver synchronization or deprovisioning validation
-* Access Reviews, SCIM provisioning
-* Final architecture diagram and demo video
+## `> cat workflows.txt`
 
-Full detail: [`docs/hybrid-identity-progress.md`](docs/hybrid-identity-progress.md)
+### Joiner — `Olivia Bennett` (GFT1031, Finance Analyst)
+```
+Employee record → -WhatIf preview (no changes) → verified clean
+       ↓
+Invoke-Joiner.ps1 executes
+       ↓
+AD account created → OU=Finance → 6 groups assigned
+       ↓
+Independent Get-ADUser check → VerificationPassed: True ✓
+```
 
-## Security Decisions
+### Mover — `Daniel Kim` (GFT1012, HR Coordinator → Junior SysAdmin)
+```
+Approved change → -WhatIf preview → verified clean
+       ↓
+Invoke-Mover.ps1 executes
+       ↓
+GG-HR-Users removed → GG-IT-Users added → OU moved to IT
+       ↓
+Independent check → GG-Server-Admins confirmed ABSENT ✓
+       ↓
+VerificationPassed: True — no privilege accumulation on title change ✓
+```
 
-* Access is granted exclusively through security groups, never direct-to-user, so a role's access is always reviewable from its group membership alone
-* Contractors receive no baseline employee access by default — access is opt-in and explicit, not opt-out
-* A title change to a systems administration role does not itself grant `GG-Server-Admins` — privileged access is a separate, deliberate decision
-* Privileged access is modeled through separate `adm-` style accounts, not the standard user account
-* The Entra hybrid administrator account was created cloud-only and scoped to a directory role, deliberately kept separate from Azure subscription-level permissions
-* MFA was registered on the privileged Entra admin account before it was used for the Cloud Sync agent configuration
-* `-WhatIf` dry-run behavior for destructive/creating operations was not trusted on the strength of the parameter existing — it was independently verified against live AD state after a bug was found doing exactly this
-* No secrets, passwords, tenant IDs, subscription IDs, public IPs, or personal information are committed to this repository (see `SECURITY.md`)
+### Leaver — `Marcus Reed` (GFT1004, Finance Contractor, terminated)
+```
+Termination confirmed → -WhatIf preview → verified clean
+       ↓
+Invoke-Leaver.ps1 executes
+       ↓
+Account disabled → GG-Contractors removed → moved to Disabled Users OU
+       ↓
+Independent check → post-offboarding groups = Domain Users ONLY ✓
+```
 
-Full detail: [`docs/architecture.md`](docs/architecture.md) and script comments in [`scripts/`](scripts/).
+Full before/whatif/after detail for each: [`docs/joiner-workflow.md`](docs/joiner-workflow.md) · [`docs/mover-workflow.md`](docs/mover-workflow.md) · [`docs/leaver-workflow.md`](docs/leaver-workflow.md)
 
-## What I Learned
+---
 
-1. **Cloud hosting alone doesn't make a project a cloud IAM project.** The differentiators here were lifecycle automation, RBAC, auditability, least privilege, and deliberate hybrid identity preparation — not just "AD running on a VM."
-2. **Never trust `-WhatIf` without independently verifying it.** The first `Invoke-Joiner.ps1` implementation still created a real AD account during a dry run. It was caught by checking `Get-ADUser` after the "preview," not by trusting the script's own claimed behavior.
-3. **A Mover workflow has to remove obsolete access, not just add new access.** Daniel's HR-specific group membership was removed as part of the same operation that granted IT access — not left behind as legacy permissions.
-4. **A job title is not an access decision.** Daniel became a Junior System Administrator but did not receive `GG-Server-Admins` — privilege has to be assigned deliberately, never inferred from a title.
-5. **Offboarding has to be verifiable, not just executed.** Marcus's termination was checked independently after the fact (disabled, correct OU, no remaining business groups) rather than trusted because the script reported success.
-6. **Authentication and authorization are different systems.** Every test identity received permissions exclusively through group membership, never a direct grant.
-7. **Azure RBAC and Microsoft Entra directory roles are separate permission systems.** The Hybrid Identity Administrator role didn't require, and wasn't given, any Azure VM/subscription-level access.
-8. **Hybrid identity requires deliberate UPN planning before sync can even be attempted.** `corp.guardianlab.internal` isn't a routable domain, so a verified `.onmicrosoft.com` suffix had to be added and applied to the pilot user before synchronization could be meaningfully tested.
+## `> ./Get-AccessAudit.ps1`
 
-## Current Status
+```
+Auditing 3 lifecycle test identities...
 
-| Area | Status |
-|---|---|
-| Local AD / IAM foundation | **Complete** |
-| JML automation (Joiner/Mover/Leaver) | **Complete** |
-| RBAC / security group model | **Complete** |
-| Access auditing | **Complete** |
-| Identity control validation | **Complete** (7/7 controls passed) |
-| Entra hybrid preparation (tenant, UPN, admin account, sync agent install) | **Complete** |
-| Actual Entra Cloud Sync execution and validation | **Not completed** |
-| Conditional Access | **Not completed** |
-| SSO | **Not completed** |
-| Managed Identity / Key Vault | **Not completed** |
+  olivia.bennett   [Finance]   [Active]    → expected access  ✓
+  daniel.kim       [IT]        [Active]    → expected access  ✓
+  marcus.reed      [Disabled]  [Disabled]  → zero access       ✓
 
-**Overall: approximately 70–75% complete.**
+RESULT: 0 of 3 accounts flagged with an access mismatch.
+```
 
-## Known Limitations / Remaining Work
+## `> ./Test-IdentityControls.ps1`
 
-The following have **not** been done and are not claimed anywhere in this repository as working:
+```
+CONTROL-001  Disabled users are not members of business groups .... PASS
+CONTROL-002  Contractors do not have GG-Server-Admins ............. PASS
+CONTROL-003  FinanceApp access limited to approved Finance Analysts PASS
+CONTROL-004  Help Desk users do not have server admin rights ...... PASS
+CONTROL-005  Privileged access uses separate adm- style accounts .. PASS
+CONTROL-006  Disabled users are located in the Disabled Users OU .. PASS
+CONTROL-007  Active employees have expected department groups ..... PASS
 
-* Cloud Sync configuration itself has not been created, and no synchronization has been run
-* No user or group has actually synchronized to Microsoft Entra ID yet
-* No cloud sign-in, password-hash sync, or cloud authentication has been validated
-* No Conditional Access policy has been deployed or tested
-* No SSO / SAML / OIDC application integration exists
-* No Azure App Service, Managed Identity, or Key Vault work has been done
-* No cloud-side Joiner/Mover/Leaver synchronization or deprovisioning has been validated
-* Access Reviews and SCIM provisioning are not implemented
-* No final architecture diagram or demo video has been produced yet
+IDENTITY CONTROLS: PASS  (7 / 7)
+```
 
-## Evidence and Screenshots
+---
 
-Screenshot filenames are reserved in [`screenshots/README.md`](screenshots/README.md) for each verified step above. All screenshots must be sanitized (passwords, temporary passwords, tenant IDs, subscription IDs, personal email, public IP, secrets/tokens redacted) before being added — see `SECURITY.md`. No screenshots have been committed yet; the filenames document what evidence exists locally and is pending manual redaction and upload.
+## `> cat entra_hybrid_status.txt`
 
-## Skills Demonstrated
+```
+[✓] Entra tenant accessed (Microsoft Entra ID Free)
+[✓] Verified *.onmicrosoft.com UPN suffix added to AD
+[✓] Pilot identity (Olivia Bennett) UPN updated + confirmed
+[✓] Dedicated cloud-only Hybrid Identity Administrator created + MFA registered
+[✓] Cloud Sync provisioning agent installed on DC01 (gMSA: provAgentgMSA)
+[✓] Agent configuration confirmed
 
-Microsoft Azure • Windows Server 2022 • Active Directory Domain Services • DNS • Azure Virtual Networking • Network Security Groups • RDP hardening • PowerShell • ActiveDirectory PowerShell module • IAM • RBAC • Least privilege • Security groups • Joiner/Mover/Leaver automation • Provisioning and deprovisioning • Access auditing • Identity governance • Control testing • Microsoft Entra ID • UPN planning • Hybrid identity preparation • Microsoft Entra Cloud Sync agent • gMSA • MFA for administrative identities • Troubleshooting • Validation • Audit logging • Change safety with `-WhatIf` / `ShouldProcess`
+[ ] Cloud Sync configuration created
+[ ] Sync agent health verified in Entra
+[ ] OU/group sync scoping applied
+[ ] Any user actually synchronized
+[ ] Cloud sign-in / password-hash validation
+[ ] Conditional Access deployed or tested
+[ ] SSO / SAML / OIDC application
+[ ] Managed Identity / Key Vault
+[ ] Access Reviews / SCIM
+
+>> Session ended immediately after agent config, before sync execution.
+>> Nothing below the line above has been run or validated. Full detail
+   in docs/hybrid-identity-progress.md — this is not glossed over.
+```
+
+---
+
+## `> cat security_decisions.txt`
+
+```
+[1] Group-based access ONLY. No direct-to-user grants.
+[2] Contractors get GG-Contractors and nothing else, by default.
+[3] A sysadmin-sounding title never auto-grants GG-Server-Admins.
+[4] Privileged access = separate adm- accounts, never the daily-driver login.
+[5] The Entra Hybrid Identity Admin is cloud-only, MFA-enforced, and
+    deliberately holds NO Azure subscription/VM permissions.
+[6] -WhatIf is never trusted on its own — every dry run is checked
+    against live AD state before the real run is trusted. (see below)
+[7] No secrets, tenant IDs, subscription IDs, or public IPs are
+    committed to this repo. See SECURITY.md.
+```
+
+---
+
+## `> cat lessons_learned.txt`
+
+```
+[1] -WhatIf lied once. Believe verification, not the flag.
+    Invoke-Joiner.ps1's first build still created a real AD account
+    during a dry run. Caught by manually running Get-ADUser after the
+    "preview" and finding the account existed. Fixed with correct
+    SupportsShouldProcess / $PSCmdlet.ShouldProcess() implementation,
+    then re-verified the same way — independently, not by re-trusting
+    the flag.
+
+[2] Mover = remove AND add, same operation.
+    Daniel's HR access came off in the same run that granted IT
+    access — not left behind as a "clean up later" step.
+
+[3] A title is not a permission.
+    "Junior System Administrator" did not earn GG-Server-Admins.
+    Privilege is a separate, deliberate decision every time.
+
+[4] Offboarding only counts if it's re-checked afterward.
+    Marcus's termination was independently audited post-run, not
+    just trusted because the script printed "success."
+
+[5] Azure RBAC ≠ Entra directory roles.
+    Hybrid Identity Administrator needed zero Azure VM access to do
+    its job. Different permission systems, kept separate on purpose.
+
+[6] Hybrid identity starts with UPN planning, not with the sync agent.
+    corp.guardianlab.internal isn't routable — a verified
+    *.onmicrosoft.com suffix had to exist and be applied to the pilot
+    user before sync could even be meaningfully attempted.
+```
+
+---
+
+## `> cat screenshots/README.md`
+
+54 evidence screenshots are indexed and reserved in [`screenshots/README.md`](screenshots/README.md), covering every completed step from `DC01` deployment through Entra Cloud Sync agent configuration. None are committed yet — each will be sanitized (no passwords, tenant IDs, subscription IDs, or public IPs) before upload. See `SECURITY.md`.
+
+---
+
+## `> cat project_status.txt`
+
+```
+LOCAL AD / IAM FOUNDATION ................. COMPLETE
+JML AUTOMATION (JOINER/MOVER/LEAVER) ...... COMPLETE
+RBAC / SECURITY GROUP MODEL ................ COMPLETE
+ACCESS AUDITING ............................ COMPLETE
+IDENTITY CONTROL VALIDATION ................ COMPLETE  (7/7 PASS)
+ENTRA HYBRID PREP (tenant/UPN/agent) ....... COMPLETE
+ACTUAL ENTRA CLOUD SYNC .................... NOT COMPLETED
+CONDITIONAL ACCESS ......................... NOT COMPLETED
+SSO ......................................... NOT COMPLETED
+MANAGED IDENTITY / KEY VAULT ............... NOT COMPLETED
+
+OVERALL: ~70-75% COMPLETE
+```
+
+Full breakdown: [`docs/project-status.md`](docs/project-status.md) · Full incomplete-work inventory: [`docs/hybrid-identity-progress.md`](docs/hybrid-identity-progress.md)
+
+---
+
+## `> grep -i "resume" summary.txt`
+
+> Built a hybrid Microsoft identity lab for a fictional fintech (Guardian Financial Technologies) — deploying Active Directory on Azure, designing group-based RBAC across 14 security groups, and building PowerShell Joiner/Mover/Leaver automation with verified `-WhatIf` safety, independent post-change verification, and 7/7 passing identity governance controls. Extended into Microsoft Entra hybrid identity by provisioning a dedicated Hybrid Identity Administrator and configuring the Entra Cloud Sync agent with a gMSA — cloud synchronization itself is the next phase in progress.
+
+---
 
 ## Disclaimer
 
-This is a **simulated environment** built for educational and portfolio purposes. Guardian Financial Technologies is a fictional company. No real employee, contractor, or personal data is used. No real tenant IDs, subscription IDs, public IP addresses, passwords, or secrets are included in this repository — see `SECURITY.md`. Work described as complete above was independently verified during the lab session; work described as not completed has not been attempted or has not been validated, and is not claimed as functioning.
+Simulated environment for educational/portfolio purposes. Guardian Financial Technologies is a fictional company; no real personal data is used. No real tenant IDs, subscription IDs, public IPs, passwords, or secrets are included — see `SECURITY.md`. Everything marked complete above was independently verified during the lab session; everything marked not completed has not been run or validated and is not claimed as working.
+
+---
+
+<p align="center">Part of the <a href="https://github.com/Luisv-Cyber"><strong>Luisv-Cyber</strong></a> security &amp; sysadmin lab portfolio</p>
+
+<p align="center">
+  <a href="https://github.com/Luisv-Cyber"><img src="https://img.shields.io/badge/GITHUB-LUISV--CYBER-black?style=for-the-badge&logo=github&logoColor=white"/></a>
+  &nbsp;
+  <a href="https://www.linkedin.com/in/luisvega03"><img src="https://img.shields.io/badge/LINKEDIN-LUISVEGA03-0a66c2?style=for-the-badge&logo=linkedin&logoColor=white"/></a>
+</p>
+
+<p align="center">
+  <sub>// checkpoint: LOCAL-AD-STABLE &nbsp;|&nbsp; ENTRA-SYNC-AGENT-CONFIGURED &nbsp;|&nbsp; SYNC-PENDING &nbsp;|&nbsp; Azure · Windows Server · Active Directory · PowerShell · Microsoft Entra ID</sub>
+</p>

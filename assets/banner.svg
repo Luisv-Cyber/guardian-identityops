@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 300" width="1200" height="300">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0e1a"/>
+      <stop offset="50%" style="stop-color:#0d1f3c"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00b4d8;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#00d4ff;stop-opacity:0.15"/>
+      <stop offset="100%" style="stop-color:#0077b6;stop-opacity:0"/>
+    </linearGradient>
+    <linearGradient id="titleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#7dd3fc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bg)"/>
+
+  <!-- Grid lines horizontal -->
+  <line x1="0" y1="60" x2="1200" y2="60" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="0" y1="120" x2="1200" y2="120" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="0" y1="180" x2="1200" y2="180" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.15"/>
+  <line x1="0" y1="240" x2="1200" y2="240" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.15"/>
+
+  <!-- Grid lines vertical -->
+  <line x1="150" y1="0" x2="150" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="300" y1="0" x2="300" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="450" y1="0" x2="450" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="600" y1="0" x2="600" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="750" y1="0" x2="750" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="900" y1="0" x2="900" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+  <line x1="1050" y1="0" x2="1050" y2="300" stroke="#00b4d8" stroke-width="0.3" stroke-opacity="0.1"/>
+
+  <!-- Glow overlay -->
+  <rect width="1200" height="300" fill="url(#glow)"/>
+
+  <!-- Accent left bar -->
+  <rect x="0" y="0" width="4" height="300" fill="#00d4ff" opacity="0.8"/>
+
+  <!-- Corner brackets -->
+  <polyline points="30,20 20,20 20,50" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-opacity="0.7"/>
+  <polyline points="1170,20 1180,20 1180,50" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-opacity="0.7"/>
+  <polyline points="30,280 20,280 20,250" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-opacity="0.7"/>
+  <polyline points="1170,280 1180,280 1180,250" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-opacity="0.7"/>
+
+  <!-- Decorative dots -->
+  <circle cx="600" cy="40" r="2" fill="#00d4ff" opacity="0.5"/>
+  <circle cx="580" cy="40" r="1.5" fill="#00d4ff" opacity="0.3"/>
+  <circle cx="620" cy="40" r="1.5" fill="#00d4ff" opacity="0.3"/>
+
+  <!-- Main title -->
+  <text x="600" y="122" font-family="'Segoe UI', Arial, sans-serif" font-size="46" font-weight="700" text-anchor="middle" fill="url(#titleGrad)">GUARDIAN IdentityOps</text>
+
+  <!-- Subtitle -->
+  <text x="600" y="156" font-family="'Segoe UI', Arial, sans-serif" font-size="16" font-weight="400" text-anchor="middle" fill="#7dd3fc" opacity="0.85">Active Directory  •  RBAC  •  PowerShell JML Automation  •  Entra Hybrid Identity</text>
+
+  <!-- Bottom badge row -->
+  <rect x="178" y="205" width="90" height="26" rx="4" fill="#0d1f3c" stroke="#334155" stroke-width="1"/>
+  <text x="223" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#94a3b8">PLATFORM</text>
+
+  <rect x="272" y="205" width="150" height="26" rx="4" fill="#1e3a5f" stroke="#00b4d8" stroke-width="1"/>
+  <text x="347" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#00d4ff">AZURE / WIN SERVER</text>
+
+  <rect x="440" y="205" width="60" height="26" rx="4" fill="#0d1f3c" stroke="#334155" stroke-width="1"/>
+  <text x="470" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#94a3b8">TOOL</text>
+
+  <rect x="504" y="205" width="120" height="26" rx="4" fill="#1e3a5f" stroke="#00b4d8" stroke-width="1"/>
+  <text x="564" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#00d4ff">POWERSHELL</text>
+
+  <rect x="642" y="205" width="60" height="26" rx="4" fill="#0d1f3c" stroke="#334155" stroke-width="1"/>
+  <text x="672" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#94a3b8">CLOUD</text>
+
+  <rect x="706" y="205" width="110" height="26" rx="4" fill="#1e3a5f" stroke="#00b4d8" stroke-width="1"/>
+  <text x="761" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#00d4ff">ENTRA ID</text>
+
+  <rect x="844" y="205" width="60" height="26" rx="4" fill="#0d1f3c" stroke="#334155" stroke-width="1"/>
+  <text x="874" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="400" text-anchor="middle" fill="#94a3b8">STATUS</text>
+
+  <rect x="908" y="205" width="130" height="26" rx="4" fill="#3d2e0d" stroke="#f5a623" stroke-width="1"/>
+  <text x="973" y="223" font-family="'Segoe UI', Arial, sans-serif" font-size="11" font-weight="700" text-anchor="middle" fill="#f5c542">IN PROGRESS ~72%</text>
+
+  <!-- Bottom line -->
+  <line x1="40" y1="258" x2="1160" y2="258" stroke="#00b4d8" stroke-width="0.5" stroke-opacity="0.3"/>
+  <text x="600" y="278" font-family="'Courier New', monospace" font-size="11" text-anchor="middle" fill="#00d4ff" opacity="0.4">// checkpoint: LOCAL-AD-STABLE // ENTRA-SYNC-AGENT-CONFIGURED // SYNC-PENDING</text>
+</svg>
