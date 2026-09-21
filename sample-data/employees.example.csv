@@ -1,0 +1,15 @@
+EmployeeID,FirstName,LastName,Department,Title,Manager,EmployeeType,Location,Status
+GFT1001,Marcus,Whitfield,IT,IT Manager,,Employee,Austin HQ,Active
+GFT1002,Priya,Anand,IT,Junior System Administrator,Marcus Whitfield,Employee,Austin HQ,Active
+GFT1003,Daniel,Reyes,IT,Help Desk Technician,Marcus Whitfield,Employee,Austin HQ,Active
+GFT1004,Marcus,Reed,Finance,Accounts Payable Analyst,Trevor Nakamura,Contractor,Remote,Active
+GFT1005,Owen,Castillo,Security,Security Manager,,Employee,Austin HQ,Active
+GFT1006,Naomi,Fischer,Security,Security Analyst,Owen Castillo,Employee,Austin HQ,Active
+GFT1007,Ava,Thompson,Human Resources,HR Manager,,Employee,Austin HQ,Active
+GFT1008,Ravi,Kapoor,Human Resources,HR Specialist,Ava Thompson,Employee,Austin HQ,Active
+GFT1009,Trevor,Nakamura,Finance,Finance Manager,,Employee,Austin HQ,Active
+GFT1010,Sofia,Delgado,Finance,Finance Analyst,Trevor Nakamura,Employee,Austin HQ,Active
+GFT1011,Grace,Odom,Operations,Operations Manager,,Employee,Austin HQ,Active
+GFT1012,Daniel,Kim,IT,Junior System Administrator,Marcus Whitfield,Employee,Austin HQ,Active
+GFT1013,Liam,Sutherland,Operations,Operations Analyst,Grace Odom,Employee,Austin HQ,Active
+GFT1031,Olivia,Bennett,Finance,Financial Analyst,Trevor Nakamura,Employee,Austin HQ,Active
