@@ -1,0 +1,28 @@
+# Guardian IdentityOps - .gitignore
+#
+# Never commit credentials, secrets, tokens, or real personal data to this
+# repository. Any Azure/Entra tenant secrets, service principal credentials,
+# API keys, or connection strings must be stored in Azure Key Vault or a
+# local, untracked configuration file - never in source control.
+
+# Secrets and credentials
+.env
+*.key
+*.pem
+*.pfx
+*.cer
+*.secret
+secrets/
+credentials/
+
+# Logs and temp output (may contain account/environment detail)
+logs/
+temp/
+*.log
+
+# Never commit:
+#  - passwords
+#  - Azure client secrets / tenant secrets
+#  - access tokens / refresh tokens
+#  - private keys or certificates
+#  - real personal information of any kind
