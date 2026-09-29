@@ -4,16 +4,24 @@
     following the GFT Mover workflow.
 
 .DESCRIPTION
-    Identifies an existing identity, records before-state group
-    membership, updates department/title, removes obsolete role-specific
-    groups, adds new role-specific groups, preserves baseline access, and
-    logs a before/after record. Never assigns GG-Server-Admins - a title
-    change (e.g. to "Junior System Administrator") is not itself grounds
-    for privileged access.
+    Identifies an existing identity, captures a full before-state snapshot
+    from AD, performs the department/title/group/OU changes, then
+    captures a full after-state snapshot and derives VerificationPassed
+    by comparing the two - not from a value the script itself fabricated.
+    Never assigns GG-Server-Admins - a title change (e.g. to "Junior
+    System Administrator") is not itself grounds for privileged access.
 
     Validated against a live environment using Daniel Kim (GFT1012),
     HR Coordinator -> Junior System Administrator. See
     docs/mover-workflow.md for the full run detail.
+
+    RECONSTRUCTED SCRIPT: earlier committed versions of this file had
+    Set-ADUser/Remove-ADGroupMember/Add-ADGroupMember/Move-ADObject
+    commented out, and VerificationPassed was computed from a hardcoded
+    array instead of a real query. This version performs the real AD
+    operations and derives Before/After/VerificationPassed from actual
+    Get-ADUser / Get-ADPrincipalGroupMembership results, matching the
+    Before/After object shape shown in the lab screenshots.
 
 .PARAMETER EmployeeID
     The EmployeeID of the identity being moved (e.g. GFT1012).
@@ -58,6 +66,37 @@ $departmentGroupMap = @{
     "Operations"      = "GG-Operations-Users"
 }
 
+function Get-IdentitySnapshot {
+    <#
+    .SYNOPSIS
+        Captures a full state snapshot for an identity, matching the
+        Before/After object shape shown in the Mover success screenshot
+        (SamAccountName, DisplayName, EmployeeID, Department, Title,
+        EmployeeType, Enabled, DistinguishedName, OrganizationalUnit,
+        Groups, Timestamp).
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$Username,
+        [Parameter(Mandatory = $true)]$EmployeeRecord
+    )
+    $adUser = Get-ADUser -Identity $Username -Properties Department, Title, Enabled, DistinguishedName, MemberOf
+    $groups = @("Domain Users") + @($adUser.MemberOf | ForEach-Object { (Get-ADGroup -Identity $_).Name }) | Select-Object -Unique
+
+    [PSCustomObject]@{
+        SamAccountName     = $Username
+        DisplayName        = "$($EmployeeRecord.FirstName) $($EmployeeRecord.LastName)"
+        EmployeeID         = $EmployeeRecord.EmployeeID
+        Department         = $adUser.Department
+        Title              = $adUser.Title
+        EmployeeType       = $EmployeeRecord.EmployeeType
+        Enabled            = $adUser.Enabled
+        DistinguishedName  = $adUser.DistinguishedName
+        OrganizationalUnit = ($adUser.DistinguishedName -replace '^CN=[^,]+,', '')
+        Groups             = $groups
+        Timestamp          = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    }
+}
+
 try {
     Write-AuditLog -LogPath $LogPath -Message "Starting Mover workflow for EmployeeID '$EmployeeID' -> $NewDepartment / $NewTitle"
 
@@ -65,42 +104,64 @@ try {
     if (-not $employee) { throw "No employee record found for EmployeeID '$EmployeeID'" }
     $username = New-UsernameFromRecord -Record $employee
 
-    # Before-state (recorded, not assumed)
-    $beforeDepartment = $employee.Department
-    # TODO (live environment): $beforeGroups = (Get-ADPrincipalGroupMembership -Identity $username).Name
-    $beforeGroups = @("Domain Users", "GG-All-Employees", "GG-EmployeePortal-Users", $departmentGroupMap[$beforeDepartment])
-    Write-AuditLog -LogPath $LogPath -Message "Before-state: Department=$beforeDepartment Groups=$($beforeGroups -join ', ')"
+    $before = Get-IdentitySnapshot -Username $username -EmployeeRecord $employee
+    Write-AuditLog -LogPath $LogPath -Message "Mover started for EmployeeID '$EmployeeID' ($username). BEFORE: Dept='$($before.Department)' Title='$($before.Title)' OU='$($before.OrganizationalUnit)' Groups='$($before.Groups -join ',')'."
 
-    $obsoleteGroup = $departmentGroupMap[$beforeDepartment]
+    $obsoleteGroup = $departmentGroupMap[$before.Department]
     $newGroup      = $departmentGroupMap[$NewDepartment]
+    $targetOU      = Get-TargetOU -Department $NewDepartment
 
-    if ($PSCmdlet.ShouldProcess($username, "Move $beforeDepartment -> $NewDepartment")) {
-        # TODO (live environment):
-        # Set-ADUser -Identity $username -Department $NewDepartment -Title $NewTitle
-        # Remove-ADGroupMember -Identity $obsoleteGroup -Members $username -Confirm:$false
-        # Add-ADGroupMember -Identity $newGroup -Members $username
-        # Move-ADObject -Identity <DN> -TargetPath (Get-TargetOU -Department $NewDepartment)
+    $shouldProcessMessage = "Set Department='$NewDepartment' Title='$NewTitle'; remove groups [$obsoleteGroup]; add groups [$newGroup]; move to OU '$targetOU'"
+
+    if ($PSCmdlet.ShouldProcess($username, $shouldProcessMessage)) {
+
+        Set-ADUser -Identity $username -Department $NewDepartment -Title $NewTitle
+
+        if ($before.Groups -contains $obsoleteGroup) {
+            Remove-ADGroupMember -Identity $obsoleteGroup -Members $username -Confirm:$false
+        }
+        if ($before.Groups -notcontains $newGroup) {
+            Add-ADGroupMember -Identity $newGroup -Members $username
+        }
 
         # Note: GG-Server-Admins is NEVER added here regardless of NewTitle.
         # Privileged access requires a separate, deliberate runbook action.
 
-        Write-AuditLog -LogPath $LogPath -Message "GroupsRemoved: $obsoleteGroup"
-        Write-AuditLog -LogPath $LogPath -Message "GroupsAdded: $newGroup"
+        Move-ADObject -Identity $before.DistinguishedName -TargetPath $targetOU
 
-        $afterGroups = @("Domain Users", "GG-All-Employees", "GG-EmployeePortal-Users", $newGroup)
-        $verificationPassed = ($afterGroups -notcontains $obsoleteGroup) -and ($afterGroups -notcontains "GG-Server-Admins")
+        $after = Get-IdentitySnapshot -Username $username -EmployeeRecord $employee
 
-        Write-AuditLog -LogPath $LogPath -Message "After-state: Department=$NewDepartment Groups=$($afterGroups -join ', ') VerificationPassed=$verificationPassed"
+        $verificationPassed = ($after.Groups -notcontains $obsoleteGroup) -and
+                               ($after.Groups -contains $newGroup) -and
+                               ($after.Groups -notcontains "GG-Server-Admins") -and
+                               ($after.OrganizationalUnit -eq $targetOU)
+
+        Write-AuditLog -LogPath $LogPath -Message "Mover AFTER for '$username': Dept='$($after.Department)' Title='$($after.Title)' OU='$($after.OrganizationalUnit)' Groups='$($after.Groups -join ',')'. Removed='$obsoleteGroup' Added='$newGroup'."
+        Write-AuditLog -LogPath $LogPath -Message "Verification $(if ($verificationPassed) {'PASSED'} else {'FAILED'}) for '$username': old access $(if ($after.Groups -notcontains $obsoleteGroup) {'removed'} else {'STILL PRESENT'}), new access $(if ($after.Groups -contains $newGroup) {'assigned'} else {'MISSING'}), $(if ($after.Groups -notcontains 'GG-Server-Admins') {'no privilege accumulation'} else {'PRIVILEGE ACCUMULATION DETECTED'})."
 
         [PSCustomObject]@{
             EmployeeID          = $EmployeeID
+            SamAccountName      = $username
+            Before              = $before
+            After               = $after
             GroupsRemoved       = $obsoleteGroup
             GroupsAdded         = $newGroup
-            NewDepartment       = $NewDepartment
-            NewTitle            = $NewTitle
-            NewOU               = Get-TargetOU -Department $NewDepartment
             VerificationPassed  = $verificationPassed
         }
+    }
+    else {
+        Write-Host ""
+        Write-Host "--- WHAT IF: Mover preview for EmployeeID '$EmployeeID' (no AD changes made) ---"
+        Write-Host "User                  : $username"
+        Write-Host "Current Dept/Title    : $($before.Department) / $($before.Title)"
+        Write-Host "New Dept/Title        : $NewDepartment / $NewTitle"
+        Write-Host "Current OU            : $($before.OrganizationalUnit)"
+        Write-Host "Target OU             : $targetOU"
+        Write-Host "Groups To Remove      : $obsoleteGroup"
+        Write-Host "Groups To Add         : $newGroup"
+        Write-Host ""
+
+        Write-AuditLog -LogPath $LogPath -Message "WHATIF: Would move '$username' to Dept='$NewDepartment' Title='$NewTitle' OU='$targetOU'. Would remove='$obsoleteGroup' Would add='$newGroup'. No AD changes were made."
     }
 }
 catch {
