@@ -1,5 +1,7 @@
 # Joiner Workflow — Validated
 
+**Status:** The run described below is historical lab evidence and is not in question. The public `Invoke-Joiner.ps1` was later found to be a non-functional scaffold and has been reconstructed to match this evidence — it has not yet been re-run against the lab to confirm it reproduces this result. See [`docs/reconstruction-notes.md`](reconstruction-notes.md).
+
 **Test identity:** Olivia Bennett — `GFT1031`
 **Department / Title:** Finance / Financial Analyst
 **Employee Type:** Employee

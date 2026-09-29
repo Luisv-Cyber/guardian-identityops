@@ -36,6 +36,7 @@
 This lab goes beyond a basic AD build. It demonstrates *controlled* identity lifecycle management: role-based access, PowerShell automation with verified safe dry-run behavior, independent post-change verification, access auditing, and governance control testing — with an honest, unfinished cloud/hybrid layer on top, not a fabricated one.
 
 **Want the full story with screenshots inline, step by step?** → [`walkthrough/README.md`](walkthrough/README.md)
+**Want to know exactly what's historical lab evidence vs. reconstructed public code?** → [`docs/reconstruction-notes.md`](docs/reconstruction-notes.md)
 
 ---
 
@@ -110,7 +111,8 @@ guardian-identityops/
 │   ├── joiner-workflow.md
 │   ├── mover-workflow.md
 │   ├── leaver-workflow.md
-│   └── hybrid-identity-progress.md
+│   ├── hybrid-identity-progress.md
+│   └── reconstruction-notes.md
 ├── scripts/
 │   ├── Invoke-Joiner.ps1
 │   ├── Invoke-Mover.ps1
@@ -172,6 +174,8 @@ Full before/whatif/after detail for each: [`docs/joiner-workflow.md`](docs/joine
 ## `> ./Get-AccessAudit.ps1`
 
 ```
+[HISTORICAL LAB RESULT — see docs/reconstruction-notes.md]
+
 Auditing 3 lifecycle test identities...
 
   olivia.bennett   [Finance]   [Active]    → expected access  ✓
@@ -181,9 +185,13 @@ Auditing 3 lifecycle test identities...
 RESULT: 0 of 3 accounts flagged with an access mismatch.
 ```
 
+`Get-AccessAudit.ps1` was found to be a non-functional placeholder (empty group list, hardcoded "no mismatch") and has been reconstructed to actually query AD and compare against expected access. The result above is preserved as a real lab finding — it has **not yet been re-validated** against the reconstructed script.
+
 ## `> ./Test-IdentityControls.ps1`
 
 ```
+[HISTORICAL LAB RESULT — see docs/reconstruction-notes.md]
+
 CONTROL-001  Disabled users are not members of business groups .... PASS
 CONTROL-002  Contractors do not have GG-Server-Admins ............. PASS
 CONTROL-003  FinanceApp access limited to approved Finance Analysts PASS
@@ -194,6 +202,8 @@ CONTROL-007  Active employees have expected department groups ..... PASS
 
 IDENTITY CONTROLS: PASS  (7 / 7)
 ```
+
+`Test-IdentityControls.ps1` was found to unconditionally return PASS for every control regardless of AD state and has been reconstructed so each control runs a real query. The result above is preserved as a real lab finding — it has **not yet been re-validated** against the reconstructed script.
 
 ---
 
@@ -311,7 +321,7 @@ Full breakdown: [`docs/project-status.md`](docs/project-status.md) · Full incom
 
 ## Disclaimer
 
-Simulated environment for educational/portfolio purposes. Guardian Financial Technologies is a fictional company; no real personal data is used. No real tenant IDs, subscription IDs, public IPs, passwords, or secrets are included — see `SECURITY.md`. Everything marked complete above was independently verified during the lab session; everything marked not completed has not been run or validated and is not claimed as working.
+Simulated environment for educational/portfolio purposes. Guardian Financial Technologies is a fictional company; no real personal data is used. No real tenant IDs, subscription IDs, public IPs, passwords, or secrets are included — see `SECURITY.md`. Everything marked complete above was independently verified during the lab session; everything marked not completed has not been run or validated and is not claimed as working. Some public scripts were found to be non-functional scaffolds that didn't match the evidenced lab behavior and have since been reconstructed from that evidence — see `docs/reconstruction-notes.md` for exactly what was reconstructed and what still needs a fresh lab re-run to confirm.
 
 ---
 

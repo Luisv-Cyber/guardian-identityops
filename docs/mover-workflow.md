@@ -1,5 +1,7 @@
 # Mover Workflow — Validated
 
+**Status:** The run described below is historical lab evidence and is not in question. The public `Invoke-Mover.ps1` was later found to be a non-functional scaffold and has been reconstructed to match this evidence — it has not yet been re-run against the lab to confirm it reproduces this result. See [`docs/reconstruction-notes.md`](reconstruction-notes.md).
+
 **Test identity:** Daniel Kim — `GFT1012`
 **Change:** Human Resources / HR Coordinator → IT / Junior System Administrator
 

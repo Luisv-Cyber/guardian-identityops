@@ -7,6 +7,13 @@
     record, applying OU placement and baseline group membership. Used to
     seed the lab environment prior to running individual JML scenarios.
 
+    STATUS: designed, not evidenced as executed. No screenshot or log
+    from the lab session shows a bulk-creation run - all three test
+    identities (Olivia Bennett, Daniel Kim, Marcus Reed) were provisioned
+    individually via Invoke-Joiner.ps1. This script is left as a
+    -WhatIf-safe scaffold; do not read its presence in this repo as
+    proof it was ever run.
+
 .PARAMETER CsvPath
     Path to the employee CSV file.
 

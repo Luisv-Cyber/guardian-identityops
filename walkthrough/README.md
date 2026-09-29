@@ -2,7 +2,7 @@
 
 This is a step-by-step narrative of how GUARDIAN IdentityOps was actually built, in the order it happened — what was done, why, how it was verified, and the screenshot proving it. For the condensed technical reference, see the main [`README.md`](../README.md) and [`docs/`](../docs/); this document is the story version.
 
-Every image below is a real screenshot taken during the build. Nothing here is staged or reconstructed after the fact.
+Every image below is a real screenshot taken during the build. Nothing here is staged or reconstructed after the fact — the images are historical evidence. The *public scripts* in `scripts/` are a separate matter: some were found to be non-functional scaffolds that didn't match what these screenshots show, and have since been reconstructed from this same evidence. See [`docs/reconstruction-notes.md`](../docs/reconstruction-notes.md) for exactly which is which.
 
 ---
 
